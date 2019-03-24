@@ -236,10 +236,10 @@ bool Mesh::LoadObj(const std::string& obj_path, const std::string& mtl_dir) {
   uv_indices_.resize(face_num);
   normal_indices_.resize(face_num);
 
-  vertices_.resize(attrib.vertices.size());
-  normals_.resize(attrib.normals.size());
-  uv_.resize(attrib.texcoords.size());
-  vertex_colors_.resize(attrib.colors.size());
+  vertices_.resize(attrib.vertices.size() / 3);
+  normals_.resize(attrib.normals.size() / 3);
+  uv_.resize(attrib.texcoords.size() / 2);
+  vertex_colors_.resize(attrib.colors.size() / 3);
 
   size_t face_offset = 0;
   // Loop over shapes
