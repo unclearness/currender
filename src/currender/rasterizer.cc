@@ -26,6 +26,41 @@ inline float EdgeFunction(const Eigen::Vector3f& a, const Eigen::Vector3f& b,
   return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]);
 }
 
+inline void InitMinMaxTableNaive(
+    const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
+    const Eigen::Vector3f& v2_i, const Eigen::Vector3f& face_normal,
+    uint32_t x0, uint32_t x1, uint32_t y0, uint32_t y1,
+    std::shared_ptr<const currender::Camera> camera,
+    std::vector<std::pair<int, int>>* minmax_table) {
+  minmax_table->resize(y1 - y0 + 1);
+
+  for (int y = y0; y <= y1; ++y) {
+    std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+    table_row.first = x1;
+    table_row.second = x0;
+
+    for (int x = x0; x <= x1; ++x) {
+      Eigen::Vector3f pixel_sample(static_cast<float>(x), static_cast<float>(y),
+                                   0.0f);
+      float w0 = EdgeFunction(v1_i, v2_i, pixel_sample);
+      float w1 = EdgeFunction(v2_i, v0_i, pixel_sample);
+      float w2 = EdgeFunction(v0_i, v1_i, pixel_sample);
+
+      Eigen::Vector3f ray_w;
+      camera->ray_w(static_cast<int>(x), static_cast<int>(y), &ray_w);
+      // even if back-face culling is enabled, dont' skip back-face
+      // need to update z-buffer to handle front-face occluded by back-face
+      bool backface = face_normal.dot(ray_w) > 0;
+
+      if ((!backface && (w0 >= 0 && w1 >= 0 && w2 >= 0)) ||
+          (backface && (w0 <= 0 && w1 <= 0 && w2 <= 0))) {
+        table_row.first = std::min(table_row.first, x);
+        table_row.second = std::max(table_row.second, x);
+      }
+    }
+  }
+}
+
 }  // namespace
 
 namespace currender {
@@ -185,73 +220,55 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
 
     float area = EdgeFunction(v0_i, v1_i, v2_i);
     if (std::abs(area) < std::numeric_limits<float>::min()) {
-        continue;
+      continue;
     }
     float denom = 1.0f / area;
 
-    // std::vector<std::pair<int, int>> minmax_table;
-    // InitMinMaxTableNaive();
+    const auto& face_normal = mesh_->face_normals()[i];
+    std::vector<std::pair<int, int>> minmax_table(y1 - y0 + 1);
+    InitMinMaxTableNaive(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
+                         &minmax_table);
 
-    //(v1_i.x() * v2_i.y() - v2_i.x() * v1_i.y());
     for (uint32_t y = y0; y <= y1; ++y) {
-      for (uint32_t x = x0; x <= x1; ++x) {
+      const std::pair<int, int>& table_row = minmax_table[y - y0];
+      for (uint32_t x = table_row.first; x <= table_row.second; ++x) {
+
         Eigen::Vector3f ray_w;
         camera_->ray_w(static_cast<int>(x), static_cast<int>(y), &ray_w);
         // even if back-face culling is enabled, dont' skip back-face
         // need to update z-buffer to handle front-face occluded by back-face
-        bool backface = mesh_->face_normals()[i].dot(ray_w) > 0;
+        bool backface = face_normal.dot(ray_w) > 0;
+
         Eigen::Vector3f pixel_sample(static_cast<float>(x),
                                      static_cast<float>(y), 0.0f);
-        float w0 = EdgeFunction(v1_i, v2_i, pixel_sample);
-        float w1 = EdgeFunction(v2_i, v0_i, pixel_sample);
-        float w2 = EdgeFunction(v0_i, v1_i, pixel_sample);
-
-        if ((!backface && (w0 >= 0 && w1 >= 0 && w2 >= 0)) ||
-            (backface && (w0 <= 0 && w1 <= 0 && w2 <= 0))) {
-          // w0 /= area;
-          // w1 /= area;
-          // w2 /= area;
-          float u = denom *
-                    EdgeFunction(v2_i, v0_i,
-                                 pixel_sample);  //(x * v2_i.y() - v2_i.x() * y);
-          float v = denom * EdgeFunction(
-                                v0_i, v1_i,
-                                pixel_sample);  //(v1_i.x() * y - x * v1_i.y());
-          assert(u >= 0 && u <= 1.0);
-          assert(v >= 0 && v <= 1.0);
+        float u = denom * EdgeFunction(v2_i, v0_i, pixel_sample);
+        float v = denom * EdgeFunction(v0_i, v1_i, pixel_sample);
+        assert(u >= 0 && u <= 1.0);
+        assert(v >= 0 && v <= 1.0);
 #if 0
          //original
           pixel_sample.z() = w0 * v0_i.z() + w1 * v1_i.z() + w2 * v2_i.z();
 #else
-          /** Perspective-Correct Interpolation **/
-          // w0 /= v0_i.z();
-          // w1 /= v1_i.z();
-          // w2 /= v2_i.z();
-          float depthnorm_w = (1.0f - u - v) / v0_i.z();
-          float depthnorm_u = u / v1_i.z();
-          float depthnorm_v = v / v2_i.z();
+        /** Perspective-Correct Interpolation **/
+        float depthnorm_w = (1.0f - u - v) / v0_i.z();
+        float depthnorm_u = u / v1_i.z();
+        float depthnorm_v = v / v2_i.z();
 
-          pixel_sample.z() = 1.0f / (depthnorm_u + depthnorm_v + depthnorm_w);
+        pixel_sample.z() = 1.0f / (depthnorm_u + depthnorm_v + depthnorm_w);
 
-          float correct_w = depthnorm_w * pixel_sample.z();
-          float correct_u = depthnorm_u * pixel_sample.z();
-          float correct_v = depthnorm_v * pixel_sample.z();
-
-
-          // w0 = w0 * pixel_sample.z();
-          // w1 = w1 * pixel_sample.z();
-          // w2 = w2 * pixel_sample.z();
-          /** Perspective-Correct Interpolation **/
+        float correct_w = depthnorm_w * pixel_sample.z();
+        float correct_u = depthnorm_u * pixel_sample.z();
+        float correct_v = depthnorm_v * pixel_sample.z();
+        /** Perspective-Correct Interpolation **/
 #endif
-          if (depth_->at(x, y, 0) < std::numeric_limits<float>::min() ||
-              pixel_sample.z() < depth_->at(x, y, 0)) {
-            depth_->at(x, y, 0) = pixel_sample.z();
-            face_id_->at(x, y, 0) = i;
-            weight_image.at(x, y, 0) = correct_w;
-            weight_image.at(x, y, 1) = correct_u;
-            weight_image.at(x, y, 2) = correct_v;
-            backface_image.at(x, y, 0) = backface ? 255 : 0;
-          }
+        if (depth_->at(x, y, 0) < std::numeric_limits<float>::min() ||
+            pixel_sample.z() < depth_->at(x, y, 0)) {
+          depth_->at(x, y, 0) = pixel_sample.z();
+          face_id_->at(x, y, 0) = i;
+          weight_image.at(x, y, 0) = correct_w;
+          weight_image.at(x, y, 1) = correct_u;
+          weight_image.at(x, y, 2) = correct_v;
+          backface_image.at(x, y, 0) = backface ? 255 : 0;
         }
       }
     }
