@@ -32,7 +32,6 @@ inline void InitMinMaxTableNaive(
     uint32_t x0, uint32_t x1, uint32_t y0, uint32_t y1,
     std::shared_ptr<const currender::Camera> camera,
     std::vector<std::pair<int, int>>* minmax_table) {
-  minmax_table->resize(y1 - y0 + 1);
 
   for (int y = y0; y <= y1; ++y) {
     std::pair<int, int>& table_row = (*minmax_table)[y - y0];
@@ -59,6 +58,19 @@ inline void InitMinMaxTableNaive(
       }
     }
   }
+}
+
+inline void InitMinMaxTable(
+  const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
+  const Eigen::Vector3f& v2_i, const Eigen::Vector3f& face_normal,
+  uint32_t x0, uint32_t x1, uint32_t y0, uint32_t y1,
+  std::shared_ptr<const currender::Camera> camera,
+  std::vector<std::pair<int, int>>* minmax_table) {
+
+  Eigen::Vector3f v_ymin;
+  Eigen::Vector3f v_l, v_r;
+
+
 }
 
 }  // namespace
@@ -189,6 +201,9 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
   // 0:(1 - u - v), 1:u, 2:v
   Image3f weight_image(camera_->width(), camera_->height(), 0.0f);
 
+  // init once with enough size
+  std::vector<std::pair<int, int>> minmax_table(camera_->height());
+
   // make face id image by z-buffer method
   for (int i = 0; i < static_cast<int>(mesh_->vertex_indices().size()); i++) {
     const Eigen::Vector3i& face = mesh_->vertex_indices()[i];
@@ -225,7 +240,6 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
     float denom = 1.0f / area;
 
     const auto& face_normal = mesh_->face_normals()[i];
-    std::vector<std::pair<int, int>> minmax_table(y1 - y0 + 1);
     InitMinMaxTableNaive(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
                          &minmax_table);
 
