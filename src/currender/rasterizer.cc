@@ -28,13 +28,13 @@ inline float EdgeFunction(const Eigen::Vector3f& a, const Eigen::Vector3f& b,
   return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]);
 }
 
-inline bool InsideTri(float x, float y){
+inline bool InsideTri(const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
+                      const Eigen::Vector3f& v2_i, float x, float y) {
   Eigen::Vector3f pixel_sample(x, y,
                                0.0f);
   float w0 = EdgeFunction(v1_i, v2_i, pixel_sample);
   float w1 = EdgeFunction(v2_i, v0_i, pixel_sample);
   float w2 = EdgeFunction(v0_i, v1_i, pixel_sample);
-
 
  if ((w0 >= 0 && w1 >= 0 && w2 >= 0) ||
       (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
@@ -249,12 +249,21 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
     }
   }
 
-  for (int y = y0; y <= y1; ++y) {
+ #if 0
+				 for (int y = y0; y <= y1; ++y) {
     std::pair<int, int>& table_row = (*minmax_table)[y - y0];
     table_row.first = std::max(static_cast<int>(x0), table_row.first);
     table_row.second = std::min(static_cast<int>(x1), table_row.second);
   }
 
+#endif  // 0
+#if 0
+				  for (int y = y0; y <= y1; ++y) {
+    std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+    table_row.first = std::max(static_cast<int>(x0), table_row.first);
+    table_row.second = std::min(static_cast<int>(x1), table_row.second);
+  }
+#endif  // 0
 }
 
 }  // namespace
@@ -424,8 +433,8 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
     float inv_denom = 1.0f / area;
 
     const auto& face_normal = mesh_->face_normals()[i];
-    if (i == 27723) {
-      LOGI("id %d\n", i);
+    //if (i == 27723) {
+    //  LOGI("id %d\n", i);
 
 #if 0
 
@@ -439,7 +448,7 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
       LOGI("%d %d (%d, %d)\n", y - y0, y, table_row.first, table_row.second);
     }
 #endif
-    }
+   // }
 #if 1
     InitMinMaxTable(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
                          &minmax_table);
