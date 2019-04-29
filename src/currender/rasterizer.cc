@@ -237,16 +237,39 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
     if (std::abs(area) < std::numeric_limits<float>::min()) {
       continue;
     }
-    float denom = 1.0f / area;
+    float inv_denom = 1.0f / area;
 
     const auto& face_normal = mesh_->face_normals()[i];
+#if 1
+
     InitMinMaxTableNaive(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
                          &minmax_table);
+#endif
+#if 0
+				    LOGI("naive\n");
+    for (uint32_t y = y0; y <= y1; ++y) {
+      const std::pair<int, int>& table_row = minmax_table[y - y0];
+      LOGI("%d %d (%d, %d)\n", y - y0, y, table_row.first, table_row.second);
+    }
+#endif
+
+#if 0
+    InitMinMaxTable(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
+                         &minmax_table);
+#endif
+#if 0
+    LOGI("new\n");
+    for (uint32_t y = y0; y <= y1; ++y) {
+      const std::pair<int, int>& table_row = minmax_table[y - y0];
+      LOGI("%d %d (%d, %d)\n", y - y0, y, table_row.first, table_row.second);
+    }
+    LOGI("\n");
+
+#endif  // 1
 
     for (uint32_t y = y0; y <= y1; ++y) {
       const std::pair<int, int>& table_row = minmax_table[y - y0];
       for (uint32_t x = table_row.first; x <= table_row.second; ++x) {
-
         Eigen::Vector3f ray_w;
         camera_->ray_w(static_cast<int>(x), static_cast<int>(y), &ray_w);
         // even if back-face culling is enabled, dont' skip back-face
@@ -255,8 +278,8 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
 
         Eigen::Vector3f pixel_sample(static_cast<float>(x),
                                      static_cast<float>(y), 0.0f);
-        float u = denom * EdgeFunction(v2_i, v0_i, pixel_sample);
-        float v = denom * EdgeFunction(v0_i, v1_i, pixel_sample);
+        float u = inv_denom * EdgeFunction(v2_i, v0_i, pixel_sample);
+        float v = inv_denom * EdgeFunction(v0_i, v1_i, pixel_sample);
         assert(u >= 0 && u <= 1.0);
         assert(v >= 0 && v <= 1.0);
 #if 0
