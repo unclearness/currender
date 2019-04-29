@@ -5,7 +5,9 @@
 
 #include "currender/rasterizer.h"
 
+#include <array>
 #include <cassert>
+#include <unordered_set>
 
 #include "currender/pixel_shader.h"
 #include "currender/timer.h"
@@ -26,17 +28,34 @@ inline float EdgeFunction(const Eigen::Vector3f& a, const Eigen::Vector3f& b,
   return (c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0]);
 }
 
+inline bool InsideTri(float x, float y){
+  Eigen::Vector3f pixel_sample(x, y,
+                               0.0f);
+  float w0 = EdgeFunction(v1_i, v2_i, pixel_sample);
+  float w1 = EdgeFunction(v2_i, v0_i, pixel_sample);
+  float w2 = EdgeFunction(v0_i, v1_i, pixel_sample);
+
+
+ if ((w0 >= 0 && w1 >= 0 && w2 >= 0) ||
+      (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
+    return true;
+  }
+
+  return false;
+
+}
+
+
 inline void InitMinMaxTableNaive(
     const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
     const Eigen::Vector3f& v2_i, const Eigen::Vector3f& face_normal,
     uint32_t x0, uint32_t x1, uint32_t y0, uint32_t y1,
     std::shared_ptr<const currender::Camera> camera,
     std::vector<std::pair<int, int>>* minmax_table) {
-
   for (int y = y0; y <= y1; ++y) {
     std::pair<int, int>& table_row = (*minmax_table)[y - y0];
-    table_row.first = x1;
-    table_row.second = x0;
+    table_row.first = x1+1;
+    table_row.second = x0-1;
 
     for (int x = x0; x <= x1; ++x) {
       Eigen::Vector3f pixel_sample(static_cast<float>(x), static_cast<float>(y),
@@ -60,16 +79,181 @@ inline void InitMinMaxTableNaive(
   }
 }
 
-inline void InitMinMaxTable(
-  const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
-  const Eigen::Vector3f& v2_i, const Eigen::Vector3f& face_normal,
-  uint32_t x0, uint32_t x1, uint32_t y0, uint32_t y1,
-  std::shared_ptr<const currender::Camera> camera,
-  std::vector<std::pair<int, int>>* minmax_table) {
+inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
+                            const Eigen::Vector3f& v1_i,
+                            const Eigen::Vector3f& v2_i,
+                            const Eigen::Vector3f& face_normal, uint32_t x0,
+                            uint32_t x1, uint32_t y0, uint32_t y1,
+                            std::shared_ptr<const currender::Camera> camera,
+                            std::vector<std::pair<int, int>>* minmax_table) {
+  std::array<Eigen::Vector3f, 3> vertices{{v0_i, v1_i, v2_i}};
+  std::unordered_set<int> indices{{0, 1, 2}};
+  int ymin_index = static_cast<int>(std::distance(
+      vertices.begin(),
+      std::min_element(vertices.begin(), vertices.end(),
+                       [](const Eigen::Vector3f& a, const Eigen::Vector3f& b) {
+                         return a.y() < b.y();
+                       })));
+  const Eigen::Vector3f& v_ymin = vertices[ymin_index];
+  indices.erase(ymin_index);
 
-  Eigen::Vector3f v_ymin;
-  Eigen::Vector3f v_l, v_r;
+  int l_index = ymin_index != 0 ? 0 : 1;
+  int r_index = l_index;
+  Eigen::Vector3f v_l{vertices[l_index]}, v_r{vertices[r_index]};
+  for (const int& i : indices) {
+    const Eigen::Vector3f& v = vertices[i];
+    if (v.x() < v_l.x()) {
+      v_l = v;
+      l_index = i;
+    }
+    if (v_r.x() < v.x()) {
+      v_r = v;
+      r_index = i;
+    }
+  }
 
+  //     v_y_min *
+  //            /  _
+  //           /     _
+  //          /        _
+  //         *
+  //
+
+#if 0
+				  currender::LOGI("v_ymin (%f, %f, %f)\n", v_ymin.x(), v_ymin.y(), v_ymin.z());
+  currender::LOGI("v_l (%f, %f, %f)\n", v_l.x(), v_l.y(), v_l.z());
+  currender::LOGI("v_r (%f, %f, %f)\n", v_r.x(), v_r.y(), v_r.z());
+
+#endif  // 0
+
+  for (int y = y0; y <= y1; ++y) {
+    std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+    table_row.first = x1 + 1;
+    table_row.second = x0 - 1;
+  }
+
+  // v_ymin to v_l line
+  // update x_min
+  {
+    Eigen::Vector3f delta = v_l - v_ymin;
+    double grad = double(delta.x()) / double(delta.y());
+    //assert(grad > 0);
+    for (int y = y0; y <= static_cast<int>(std::floor(v_l.y())); ++y) {
+      std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+      double xf = double(grad) * double(y- v_ymin.y()) + double(v_ymin.x());
+#if 0
+				      float integral_part{0.0f};
+      float fractional_part = std::modf(xf, &integral_part);
+      int xi = static_cast<int>(integral_part);
+      if (fractional_part < 0.5f) {
+        table_row.first = xi + 1;
+      } else {
+        table_row.first = xi + 1;
+      }
+#else
+      int xi = static_cast<int>(std::ceil(xf));
+      table_row.first = xi;
+#endif  // 0
+
+    }
+  }
+
+  // v_y_min to v_r line
+  // update x_max
+  {
+    Eigen::Vector3f delta = v_r - v_ymin;
+    double grad = double(delta.x()) / double(delta.y());
+   // assert(grad > 0);
+    for (int y = y0; y <= static_cast<int>(std::floor(v_r.y())); ++y) {
+      std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+      double xf = double(grad) * double(y - v_ymin.y()) + double(v_ymin.x());
+#if 0
+      float integral_part{0.0f};
+      float fractional_part = std::modf(xf, &integral_part);
+      int xi = static_cast<int>(integral_part);
+								      if (fractional_part < 0.5f) {
+        table_row.second = xi;
+      } else {
+        table_row.second = xi - 1;
+      }
+#else
+      int xi = static_cast<int>(std::floor(xf));
+      table_row.second = xi;
+#endif  // 1
+
+      //table_row.second = xi - 1;
+    }
+  }
+
+  // final line: v_l to v_r
+  if (v_l.y() < v_r.y()) {
+    // v_l is upper than v_r case
+    // update x_min
+    Eigen::Vector3f delta = v_r - v_l;
+    float grad = delta.x() / delta.y();
+
+    int y_start =
+        std::max(static_cast<int>(y0), static_cast<int>(std::ceil(v_l.y())));
+    int y_end = std::min(static_cast<int>(y1), static_cast<int>(std::floor(v_r.y())));
+
+    //assert(grad > 0);
+    for (int y = y_start;
+         y <= y_end; ++y) {
+      std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+      float xf = grad * (y - v_l.y()) + v_l.x();
+#if 0
+				      float integral_part{0.0f};
+      float fractional_part = std::modf(xf, &integral_part);
+      int xi = static_cast<int>(integral_part);
+      if (fractional_part < 0.5f) {
+        table_row.first = xi + 1;
+      } else {
+        table_row.first = xi + 1;
+      }
+#else
+      int xi = static_cast<int>(std::ceil(xf));
+      table_row.first = xi;
+#endif  // 0
+
+    }
+
+  } else {
+    // v_l is lower than v_r case
+    // update x_max
+    Eigen::Vector3f delta = v_l - v_r;
+    float grad = delta.x() / delta.y();
+   // assert(grad < 0);
+    int y_start =
+        std::max(static_cast<int>(y0), static_cast<int>(std::ceil(v_r.y())));
+    int y_end =
+        std::min(static_cast<int>(y1), static_cast<int>(std::floor(v_l.y())));
+
+    for (int y = y_start;
+         y <= y_end; ++y) {
+      std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+      float xf = grad * (y -v_r.y())+ v_r.x();
+#if 0
+      float integral_part{0.0f};
+      float fractional_part = std::modf(xf, &integral_part);
+      int xi = static_cast<int>(integral_part);
+								      if (fractional_part < 0.5f) {
+        table_row.second = xi;
+      } else {
+        table_row.second = xi - 1;
+      }
+#else
+      int xi = static_cast<int>(std::floor(xf));
+      table_row.second = xi;
+#endif  // 
+
+    }
+  }
+
+  for (int y = y0; y <= y1; ++y) {
+    std::pair<int, int>& table_row = (*minmax_table)[y - y0];
+    table_row.first = std::max(static_cast<int>(x0), table_row.first);
+    table_row.second = std::min(static_cast<int>(x1), table_row.second);
+  }
 
 }
 
@@ -240,7 +424,10 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
     float inv_denom = 1.0f / area;
 
     const auto& face_normal = mesh_->face_normals()[i];
-#if 1
+    if (i == 27723) {
+      LOGI("id %d\n", i);
+
+#if 0
 
     InitMinMaxTableNaive(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
                          &minmax_table);
@@ -252,8 +439,8 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
       LOGI("%d %d (%d, %d)\n", y - y0, y, table_row.first, table_row.second);
     }
 #endif
-
-#if 0
+    }
+#if 1
     InitMinMaxTable(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
                          &minmax_table);
 #endif
@@ -280,6 +467,9 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
                                      static_cast<float>(y), 0.0f);
         float u = inv_denom * EdgeFunction(v2_i, v0_i, pixel_sample);
         float v = inv_denom * EdgeFunction(v0_i, v1_i, pixel_sample);
+
+        //u = std::min(std::max(0.0f, u), 1.0f);
+        //v = std::min(std::max(0.0f, v), 1.0f);
         assert(u >= 0 && u <= 1.0);
         assert(v >= 0 && v <= 1.0);
 #if 0
