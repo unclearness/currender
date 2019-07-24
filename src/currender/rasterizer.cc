@@ -30,21 +30,17 @@ inline float EdgeFunction(const Eigen::Vector3f& a, const Eigen::Vector3f& b,
 
 inline bool InsideTri(const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
                       const Eigen::Vector3f& v2_i, float x, float y) {
-  Eigen::Vector3f pixel_sample(x, y,
-                               0.0f);
+  Eigen::Vector3f pixel_sample(x, y, 0.0f);
   float w0 = EdgeFunction(v1_i, v2_i, pixel_sample);
   float w1 = EdgeFunction(v2_i, v0_i, pixel_sample);
   float w2 = EdgeFunction(v0_i, v1_i, pixel_sample);
 
- if ((w0 >= 0 && w1 >= 0 && w2 >= 0) ||
-      (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
+  if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
     return true;
   }
 
   return false;
-
 }
-
 
 inline void InitMinMaxTableNaive(
     const Eigen::Vector3f& v0_i, const Eigen::Vector3f& v1_i,
@@ -54,8 +50,8 @@ inline void InitMinMaxTableNaive(
     std::vector<std::pair<int, int>>* minmax_table) {
   for (int y = y0; y <= y1; ++y) {
     std::pair<int, int>& table_row = (*minmax_table)[y - y0];
-    table_row.first = x1+1;
-    table_row.second = x0-1;
+    table_row.first = x1 + 1;
+    table_row.second = x0 - 1;
 
     for (int x = x0; x <= x1; ++x) {
       Eigen::Vector3f pixel_sample(static_cast<float>(x), static_cast<float>(y),
@@ -137,10 +133,10 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
   {
     Eigen::Vector3f delta = v_l - v_ymin;
     double grad = double(delta.x()) / double(delta.y());
-    //assert(grad > 0);
+    // assert(grad > 0);
     for (int y = y0; y <= static_cast<int>(std::floor(v_l.y())); ++y) {
       std::pair<int, int>& table_row = (*minmax_table)[y - y0];
-      double xf = double(grad) * double(y- v_ymin.y()) + double(v_ymin.x());
+      double xf = double(grad) * double(y - v_ymin.y()) + double(v_ymin.x());
 #if 0
 				      float integral_part{0.0f};
       float fractional_part = std::modf(xf, &integral_part);
@@ -154,7 +150,6 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
       int xi = static_cast<int>(std::ceil(xf));
       table_row.first = xi;
 #endif  // 0
-
     }
   }
 
@@ -163,7 +158,7 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
   {
     Eigen::Vector3f delta = v_r - v_ymin;
     double grad = double(delta.x()) / double(delta.y());
-   // assert(grad > 0);
+    // assert(grad > 0);
     for (int y = y0; y <= static_cast<int>(std::floor(v_r.y())); ++y) {
       std::pair<int, int>& table_row = (*minmax_table)[y - y0];
       double xf = double(grad) * double(y - v_ymin.y()) + double(v_ymin.x());
@@ -181,7 +176,7 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
       table_row.second = xi;
 #endif  // 1
 
-      //table_row.second = xi - 1;
+      // table_row.second = xi - 1;
     }
   }
 
@@ -194,11 +189,11 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
 
     int y_start =
         std::max(static_cast<int>(y0), static_cast<int>(std::ceil(v_l.y())));
-    int y_end = std::min(static_cast<int>(y1), static_cast<int>(std::floor(v_r.y())));
+    int y_end =
+        std::min(static_cast<int>(y1), static_cast<int>(std::floor(v_r.y())));
 
-    //assert(grad > 0);
-    for (int y = y_start;
-         y <= y_end; ++y) {
+    // assert(grad > 0);
+    for (int y = y_start; y <= y_end; ++y) {
       std::pair<int, int>& table_row = (*minmax_table)[y - y0];
       float xf = grad * (y - v_l.y()) + v_l.x();
 #if 0
@@ -214,7 +209,6 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
       int xi = static_cast<int>(std::ceil(xf));
       table_row.first = xi;
 #endif  // 0
-
     }
 
   } else {
@@ -222,16 +216,15 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
     // update x_max
     Eigen::Vector3f delta = v_l - v_r;
     float grad = delta.x() / delta.y();
-   // assert(grad < 0);
+    // assert(grad < 0);
     int y_start =
         std::max(static_cast<int>(y0), static_cast<int>(std::ceil(v_r.y())));
     int y_end =
         std::min(static_cast<int>(y1), static_cast<int>(std::floor(v_l.y())));
 
-    for (int y = y_start;
-         y <= y_end; ++y) {
+    for (int y = y_start; y <= y_end; ++y) {
       std::pair<int, int>& table_row = (*minmax_table)[y - y0];
-      float xf = grad * (y -v_r.y())+ v_r.x();
+      float xf = grad * (y - v_r.y()) + v_r.x();
 #if 0
       float integral_part{0.0f};
       float fractional_part = std::modf(xf, &integral_part);
@@ -244,12 +237,11 @@ inline void InitMinMaxTable(const Eigen::Vector3f& v0_i,
 #else
       int xi = static_cast<int>(std::floor(xf));
       table_row.second = xi;
-#endif  // 
-
+#endif  //
     }
   }
 
- #if 0
+#if 0
 				 for (int y = y0; y <= y1; ++y) {
     std::pair<int, int>& table_row = (*minmax_table)[y - y0];
     table_row.first = std::max(static_cast<int>(x0), table_row.first);
@@ -433,7 +425,7 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
     float inv_denom = 1.0f / area;
 
     const auto& face_normal = mesh_->face_normals()[i];
-    //if (i == 27723) {
+    // if (i == 27723) {
     //  LOGI("id %d\n", i);
 
 #if 0
@@ -448,10 +440,10 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
       LOGI("%d %d (%d, %d)\n", y - y0, y, table_row.first, table_row.second);
     }
 #endif
-   // }
+    // }
 #if 1
     InitMinMaxTable(v0_i, v1_i, v2_i, face_normal, x0, x1, y0, y1, camera_,
-                         &minmax_table);
+                    &minmax_table);
 #endif
 #if 0
     LOGI("new\n");
@@ -477,8 +469,8 @@ bool Rasterizer::Impl::Render(Image3b* color, Image1f* depth, Image3f* normal,
         float u = inv_denom * EdgeFunction(v2_i, v0_i, pixel_sample);
         float v = inv_denom * EdgeFunction(v0_i, v1_i, pixel_sample);
 
-        //u = std::min(std::max(0.0f, u), 1.0f);
-        //v = std::min(std::max(0.0f, v), 1.0f);
+        // u = std::min(std::max(0.0f, u), 1.0f);
+        // v = std::min(std::max(0.0f, v), 1.0f);
         assert(u >= 0 && u <= 1.0);
         assert(v >= 0 && v <= 1.0);
 #if 0
