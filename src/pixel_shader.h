@@ -9,11 +9,13 @@
 #include <memory>
 #include <utility>
 
-#include "currender/common.h"
-#include "currender/image.h"
-#include "currender/mesh.h"
 #include "currender/renderer.h"
-#include "nanort/nanort.h"
+
+#include "nanort.h"
+
+#include "ugu/common.h"
+#include "ugu/image.h"
+#include "ugu/mesh.h"
 
 namespace currender {
 

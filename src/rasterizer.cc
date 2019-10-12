@@ -8,8 +8,9 @@
 #include <cassert>
 
 #include "src/pixel_shader.h"
-#include "src/timer.h"
 #include "src/util_private.h"
+
+#include "ugu/timer.h"
 
 namespace {
 
