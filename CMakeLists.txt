@@ -35,9 +35,9 @@ else()
 endif()
 
 function(set_with_parent ARG_NAME ARG_PATH ARG_TEXT)
-    set(${ARG_NAME} ${ARG_PATH} CACHE PATH ${ARG_TEXT})
+    set(${ARG_NAME} ${ARG_PATH} CACHE PATH ${ARG_TEXT} FORCE)
     if (hasParent)
-      set(${ARG_NAME} ${ARG_PATH} CACHE PATH ${ARG_TEXT} PARENT_SCOPE)
+      set(${ARG_NAME} ${ARG_PATH} PARENT_SCOPE)
     endif()
 endfunction(set_with_parent)
 
