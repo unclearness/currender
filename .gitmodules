@@ -1,18 +1,6 @@
 [submodule "third_party/nanort"]
 	path = third_party/nanort
 	url = https://github.com/lighttransport/nanort.git
-[submodule "third_party/tinyobjloader"]
-	path = third_party/tinyobjloader
-	url = https://github.com/syoyo/tinyobjloader.git
-[submodule "third_party/stb"]
-	path = third_party/stb
-	url = https://github.com/nothings/stb.git
-[submodule "third_party/eigen"]
-	path = third_party/eigen
-	url = https://github.com/eigenteam/eigen-git-mirror.git
-[submodule "third_party/lodepng"]
-	path = third_party/lodepng
-	url = https://github.com/lvandeve/lodepng
-[submodule "third_party/tinycolormap"]
-	path = third_party/tinycolormap
-	url = https://github.com/yuki-koyama/tinycolormap.git
+[submodule "third_party/ugu"]
+	path = third_party/ugu
+	url = https://github.com/unclearness/ugu.git

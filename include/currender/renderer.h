@@ -8,10 +8,12 @@
 #include <memory>
 #include <vector>
 
-#include "currender/camera.h"
-#include "currender/mesh.h"
+#include "ugu/camera.h"
+#include "ugu/mesh.h"
 
 namespace currender {
+
+using namespace ugu;
 
 // Diffuse color
 enum class DiffuseColor {

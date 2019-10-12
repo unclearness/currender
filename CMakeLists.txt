@@ -27,98 +27,64 @@ set(CMAKE_CXX_FLAGS  "-std=c++14 -Wall -O2")
 
 endif()
 
+get_directory_property(hasParent PARENT_DIRECTORY)
+if(hasParent)
+  message(STATUS "Has a parent scope.")
+else()
+  message(STATUS "Doesn't have a parent scope.")
+endif()
+
+function(set_with_parent ARG_NAME ARG_PATH ARG_TEXT)
+    set(${ARG_NAME} ${ARG_PATH} CACHE PATH ${ARG_TEXT})
+    if (hasParent)
+      set(${ARG_NAME} ${ARG_PATH} CACHE PATH ${ARG_TEXT} PARENT_SCOPE)
+    endif()
+endfunction(set_with_parent)
+
+set(Currender_LIBS)
+set(Currender_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR};${CMAKE_CURRENT_SOURCE_DIR}/include;${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 # third_party directries
 if(NOT DEFINED NANORT_INSTALL_DIR)
-  set(NANORT_INSTALL_DIR "third_party/nanort" CACHE PATH "NanoRT installed directory")
+  set_with_parent(NANORT_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/nanort" "NanoRT installed directory")
 endif()
-message("NANORT_INSTALL_DIR: ${NANORT_INSTALL_DIR}") 
-if(NOT DEFINED STB_INSTALL_DIR)
-  set(STB_INSTALL_DIR "third_party/stb" CACHE PATH "stb installed directory")
+message("NANORT_INSTALL_DIR: ${NANORT_INSTALL_DIR}")
+
+if(NOT DEFINED UGU_INSTALL_DIR)
+  set_with_parent(UGU_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ugu" "UGU installed directory")
 endif()
-message("STB_INSTALL_DIR: ${STB_INSTALL_DIR}") 
-if(NOT DEFINED TINYOBJLOADER_INSTALL_DIR)
-  set(TINYOBJLOADER_INSTALL_DIR "third_party/tinyobjloader" CACHE PATH "tinyobjloader installed directory")
+message("UGU_INSTALL_DIR: ${UGU_INSTALL_DIR}")
+
+add_subdirectory(${UGU_INSTALL_DIR})
+
+# inherit definitions from ugu
+# todo: find better way...
+if(UGU_USE_STB)
+  add_definitions(-DUGU_USE_STB)
 endif()
-message("TINYOBJLOADER_INSTALL_DIR: ${TINYOBJLOADER_INSTALL_DIR}")
-if(NOT DEFINED EIGEN_INSTALL_DIR)
-  set(EIGEN_INSTALL_DIR "third_party/eigen" CACHE PATH "eigen installed directory")
-message("EIGEN_INSTALL_DIR: ${EIGEN_INSTALL_DIR}") 
+if(UGU_USE_OPENCV)
+  add_definitions(-DUGU_USE_OPENCV)
+  # need to find again here otherwise linking fails.
+  # ${OpenCV_LIBS} contains only names (no directory) of all modules
+  # while full path of world module is linked in VS project...
+  find_package(OpenCV REQUIRED)
+  add_definitions(-DUGU_USE_OPENCV)
+  set(Currender_LIBS ${Currender_LIBS} ${OpenCV_LIBS})
 endif()
-if(NOT DEFINED LODEPNG_INSTALL_DIR)
-  set(LODEPNG_INSTALL_DIR "third_party/lodepng" CACHE PATH "LodePNG installed directory")
+if(UGU_USE_TINYOBJLOADER)
+  add_definitions(-DUGU_USE_TINYOBJLOADER)
 endif()
-if(NOT DEFINED TINYCOLORMAP_INSTALL_DIR)
-  set(TINYCOLORMAP_INSTALL_DIR "third_party/tinycolormap" CACHE PATH "tinycolormap installed directory")
+if(UGU_USE_LODEPNG)
+  add_definitions(-DUGU_USE_LODEPNG)
+endif()
+if(UGU_USE_TINYCOLORMAP)
+  add_definitions(-DUGU_USE_TINYCOLORMAP)
+endif()
+if(UGU_USE_OPENMP)
+  add_definitions(-DUGU_USE_OPENMP)
 endif()
 
 # switch for optional libraries
-option(CURRENDER_USE_STB "Use stb to enable image i/o" ON)
-message("CURRENDER_USE_STB: ${CURRENDER_USE_STB}")
-if(CURRENDER_USE_STB)
-  add_definitions(-DCURRENDER_USE_STB)
-  option(CURRENDER_USE_STB_BUT_NO_IMPLEMENTATION "Include stb but implement somewhere else" OFF)
-  if (NOT CURRENDER_USE_STB_BUT_NO_IMPLEMENTATION)
-    option(CURRENDER_USE_STB_AS_STATIC_LIB "Use stb as static lib" OFF)
-    message("CURRENDER_USE_STB_AS_STATIC_LIB: ${CURRENDER_USE_STB_AS_STATIC_LIB}")
-    if(CURRENDER_USE_STB_AS_STATIC_LIB)
-      add_library(stb
-        STATIC
-        src/stb.cc)
-      set(STB_LIB_NAME stb)
-    else()
-      set(CURRENDER_STB_IMPLEMENTATION_CC src/stb.cc)
-    endif()
-  endif()
-endif()
-
-option(CURRENDER_USE_OPENCV "Use OpenCV as Image class" OFF)
-message("CURRENDER_USE_OPENCV: ${CURRENDER_USE_OPENCV}")
-if(CURRENDER_USE_OPENCV)
-  find_package(OpenCV REQUIRED)
-  add_definitions(-DCURRENDER_USE_OPENCV)
-endif()
-
-option(CURRENDER_USE_TINYOBJLOADER "Use tinyobjloader to enable .obj input" ON)
-message("CURRENDER_USE_TINYOBJLOADER: ${CURRENDER_USE_TINYOBJLOADER}")
-if(CURRENDER_USE_TINYOBJLOADER)
-  add_definitions(-DCURRENDER_USE_TINYOBJLOADER)
-  option(CURRENDER_USE_TINYOBJLOADER_BUT_NO_IMPLEMENTATION "Include tinyobjloader but implement somewhere else" OFF)
-  if (NOT CURRENDER_USE_TINYOBJLOADER_BUT_NO_IMPLEMENTATION)
-    option(CURRENDER_USE_TINYOBJLOADER_AS_STATIC_LIB "Use tinyobjloader as static lib" OFF)
-    message("CURRENDER_USE_TINYOBJLOADER_AS_STATIC_LIB: ${CURRENDER_USE_TINYOBJLOADER_AS_STATIC_LIB}")
-    if(CURRENDER_USE_TINYOBJLOADER_AS_STATIC_LIB)
-      add_subdirectory(${TINYOBJLOADER_INSTALL_DIR})
-      set(TINYOBJLOADER_LIB_NAME tinyobjloader)
-    else()
-      set(CURRENDER_TINYOBJLOADER_IMPLEMENTATION_CC ${TINYOBJLOADER_INSTALL_DIR}/tiny_obj_loader.cc)
-    endif()
-  endif()
-endif()
-
-option(CURRENDER_USE_LODEPNG "Use LodePNG to enable image i/o, especially for 16bit" ON)
-message("CURRENDER_USE_LODEPNG: ${CURRENDER_USE_LODEPNG}")
-if(CURRENDER_USE_LODEPNG)
-  add_definitions(-DCURRENDER_USE_LODEPNG)
-  option(CURRENDER_USE_LODEPNG_AS_STATIC_LIB "Use LodePNG as static lib" OFF)
-  if(CURRENDER_USE_LODEPNG_AS_STATIC_LIB)
-    add_library(lodepng
-      STATIC
-      ${LODEPNG_INSTALL_DIR}/lodepng.cpp
-      ${LODEPNG_INSTALL_DIR}/lodepng.h)
-      set(LODEPNG_LIB_NAME lodepng)
-  else()
-   set(CURRENDER_LODEPNG_SOURCES
-      ${LODEPNG_INSTALL_DIR}/lodepng.cpp
-      ${LODEPNG_INSTALL_DIR}/lodepng.h)
-  endif()
-endif()
-
-option(CURRENDER_USE_TINYCOLORMAP "Use tinycolormap for visualization" ON)
-message("CURRENDER_USE_TINYCOLORMAP: ${CURRENDER_USE_TINYCOLORMAP}")
-if(CURRENDER_USE_TINYCOLORMAP)
-  add_definitions(-DCURRENDER_USE_TINYCOLORMAP)
-endif()
-
 option(CURRENDER_USE_OPENMP "Use OpenMP to enable parallelization" ON)
 message("CURRENDER_USE_OPENMP: ${CURRENDER_USE_OPENMP}")
 if(CURRENDER_USE_OPENMP)
@@ -129,6 +95,7 @@ option(CURRENDER_USE_NANORT "Use NanoRT for Raytracer" ON)
 message("CURRENDER_USE_NANORT: ${CURRENDER_USE_NANORT}")
 if(CURRENDER_USE_NANORT)
   add_definitions(-DCURRENDER_USE_NANORT)
+  set(Currender_INCLUDE_DIRS ${Currender_INCLUDE_DIRS} ${NANORT_INSTALL_DIR})
 endif()
 
 # For OpenMP
@@ -140,73 +107,50 @@ if(CURRENDER_USE_OPENMP)
   endif()
 endif()
 
-set(PUBLIC_LIB_NAME ${PROJECT_NAME})
-add_library(${PUBLIC_LIB_NAME}
+set(Currender_LIB ${PROJECT_NAME})
+add_library(${Currender_LIB}
   STATIC
-  include/currender/common.h
   include/currender/renderer.h
   include/currender/raytracer.h
   include/currender/rasterizer.h
-  include/currender/camera.h
-  include/currender/mesh.h
-  include/currender/image.h
-  include/currender/log.h
-  include/currender/util.h
 
   src/raytracer.cc
   src/rasterizer.cc
-  src/camera.cc
-  src/mesh.cc
-  src/image.cc
   src/pixel_shader.h
-  src/timer.h
-  src/log.cc
-  src/util.cc
   src/util_private.h
   src/util_private.cc
-
-  # implementations of header-only library
-  ${CURRENDER_STB_IMPLEMENTATION_CC}
-  ${CURRENDER_TINYOBJLOADER_IMPLEMENTATION_CC}
-
-  # lodepng
-  ${CURRENDER_LODEPNG_SOURCES}
 )
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-include_directories(${NANORT_INSTALL_DIR})
-include_directories(${EIGEN_INSTALL_DIR})
-include_directories(${TINYOBJLOADER_INSTALL_DIR})
-include_directories(${STB_INSTALL_DIR}/..)
-include_directories(${LODEPNG_INSTALL_DIR})
-include_directories(${TINYCOLORMAP_INSTALL_DIR})
-include_directories(${OpenCV_INCLUDE_DIRS})
+set(Currender_LIBS ${Currender_LIBS} ${Currender_LIB} ${Ugu_LIBS})
+set(Currender_INCLUDE_DIRS ${Currender_INCLUDE_DIRS} ${Ugu_INCLUDE_DIRS})
 
-set_target_properties(${PUBLIC_LIB_NAME} PROPERTIES VERSION ${PROJECT_VERSION})
+set_with_parent(Currender_LIBS "${Currender_LIBS}" "Currender_LIBS")
+set_with_parent(Currender_INCLUDE_DIRS "${Currender_INCLUDE_DIRS}" "Currender_INCLUDE_DIRS")
 
-set(MINIMUM_EXAMPLE_EXE currender_minimum_example)
-add_executable(${MINIMUM_EXAMPLE_EXE}
-  minimum_example.cc)
-target_link_libraries(${MINIMUM_EXAMPLE_EXE}
-  ${PUBLIC_LIB_NAME}
-  ${STB_LIB_NAME}
-  ${TINYOBJLOADER_LIB_NAME}
-  ${LODEPNG_LIB_NAME}
-  ${OpenCV_LIBS}
-  )
+message("Currender_LIBS: ${Currender_LIBS}") 
+message("Currender_INCLUDE_DIRS: ${Currender_INCLUDE_DIRS}") 
 
-set(EXAMPLES_EXE currender_examples)
-add_executable(${EXAMPLES_EXE}
-  examples.cc)
-target_link_libraries(${EXAMPLES_EXE}
-  ${PUBLIC_LIB_NAME}
-  ${STB_LIB_NAME}
-  ${TINYOBJLOADER_LIB_NAME}
-  ${LODEPNG_LIB_NAME}
-  ${OpenCV_LIBS}
-  )
+target_include_directories(${Currender_LIB} PUBLIC ${Currender_INCLUDE_DIRS})
+set_target_properties(${Currender_LIB} PROPERTIES VERSION ${PROJECT_VERSION})
+
+if (NOT hasParent)
+  set(MINIMUM_EXAMPLE_EXE currender_minimum_example)
+  add_executable(${MINIMUM_EXAMPLE_EXE}
+    minimum_example.cc)
+  target_include_directories(${MINIMUM_EXAMPLE_EXE} PRIVATE ${Currender_INCLUDE_DIRS})
+  target_link_libraries(${MINIMUM_EXAMPLE_EXE}
+    ${Currender_LIBS}
+    )
+
+  set(EXAMPLES_EXE currender_examples)
+  add_executable(${EXAMPLES_EXE}
+    examples.cc)
+  target_include_directories(${EXAMPLES_EXE} PRIVATE ${Currender_INCLUDE_DIRS})
+  target_link_libraries(${EXAMPLES_EXE}
+    ${Currender_LIBS}
+    )
+endif()
+
 if (WIN32)
   set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT ${EXAMPLES_EXE})
   # suppress C2338 for eigen
@@ -233,12 +177,14 @@ file(DOWNLOAD http://www.kunzhou.net/tex-models/bunny.zip ${CMAKE_CURRENT_SOURCE
 endif()
 
 # unzip test data
-add_custom_target( unZip ALL)
-add_custom_command(TARGET unZip PRE_BUILD
-   COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny.zip
-WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny
-DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny.zip
-COMMENT "Unpacking bunny.zip"
-VERBATIM)
+if (NOT hasParent)
+  add_custom_target( Currender_UNZip ALL)
+  add_custom_command(TARGET Currender_UNZip PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E tar xzf ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny.zip
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/bunny.zip
+  COMMENT "Unpacking bunny.zip"
+  VERBATIM)
+endif()
 
 endif()

@@ -9,10 +9,12 @@
 
 #include <cassert>
 
-#include "nanort/nanort.h"
+#include "nanort.h"
+
 #include "src/pixel_shader.h"
-#include "src/timer.h"
 #include "src/util_private.h"
+
+#include "ugu/timer.h"
 
 namespace {
 inline void PrepareRay(nanort::Ray<float>* ray,
