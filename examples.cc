@@ -10,7 +10,7 @@
 
 #include "currender/rasterizer.h"
 #include "currender/raytracer.h"
-#include "currender/util.h"
+#include "ugu/util.h"
 
 // #define USE_RASTERIZER
 
